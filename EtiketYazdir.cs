@@ -15,7 +15,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("Etiket Yazdır")]
 [assembly: System.Reflection.AssemblyProduct("Etiket Yazdır")]
 [assembly: System.Reflection.AssemblyCompany("Önsel Özden")]
-[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.0.0")]
 
 namespace EtiketYazdir
 {
@@ -214,7 +214,7 @@ namespace EtiketYazdir
             menu.Items.Add(new ToolStripMenuItem("Ayarlar", null, delegate { AyarlarAc(); }));
             menu.Items.Add(new ToolStripMenuItem("Hakkında", null, delegate
             {
-                MessageBox.Show(this, "Etiket Yazdır v1.1\n\nTermal etiket yazıcıları için\nmetin ve görsel çıktı programı.\n\nHazırlayan: Önsel Özden",
+                MessageBox.Show(this, "Etiket Yazdır v1.2\n\nTermal etiket yazıcıları için\nmetin ve görsel çıktı programı.\n\nHazırlayan: Önsel Özden",
                     "Hakkında", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }));
 
@@ -619,7 +619,7 @@ namespace EtiketYazdir
                             g.PageUnit = GraphicsUnit.Pixel;
                             g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
                             float olcH = g.MeasureString(metin, f, ic, sf).Height;
-                            int satir = metin.Split('\n').Length;
+                            int satir = metin.Split(new char[] { '\n' }).Length;
                             float minH = f.GetHeight(g) * satir;
                             h = (int)Math.Ceiling(Math.Max(olcH, minH)) + 6;
                         }
@@ -680,7 +680,7 @@ namespace EtiketYazdir
         // Satırların hepsi genişliğe (ve sabit boyda yüksekliğe) sığacak en büyük punto
         static float OtoBoyut(string text, string fad, FontStyle st, int dpi, int ic, int maxH)
         {
-            string[] satirlar = text.Replace("\r", "").Split('\n');
+            string[] satirlar = text.Replace("\r", "").Split(new char[] { '\n' });
             using (Bitmap olc = new Bitmap(1, 1))
             using (StringFormat sf = (StringFormat)StringFormat.GenericTypographic.Clone())
             {
@@ -758,7 +758,7 @@ namespace EtiketYazdir
         // Otomatik boyut: her satır aynı puntoda, en uzun satır genişliği doldurur
         static Bitmap OtoMetin(string text, string fad, FontStyle st, int dpi, int ic, int maxH, int hiza, out float pt)
         {
-            string[] satirlar = text.Replace("\r", "").TrimEnd('\n', ' ').Split('\n');
+            string[] satirlar = text.Replace("\r", "").TrimEnd('\n', ' ').Split(new char[] { '\n' });
             const float REF = 60f;
             float maxW = 0, topH = 0, bosH = REF / 72f * dpi * 0.9f;
             int dolu = 0;
