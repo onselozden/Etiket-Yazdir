@@ -63,7 +63,7 @@ namespace EtiketYazdir
                 CultureInfo c = CultureInfo.InvariantCulture;
                 string v;
                 if (d.TryGetValue("Yazici", out v)) a.Yazici = v;
-                if (d.TryGetValue("GenislikMm", out v)) a.GenislikMm = int.Parse(v) == 55 ? 55 : 72;
+                if (d.TryGetValue("GenislikMm", out v)) a.GenislikMm = (int.Parse(v) == 55 || int.Parse(v) == 50) ? 50 : 72;
                 if (d.TryGetValue("SabitBoy", out v)) a.SabitBoy = v == "1";
                 if (d.TryGetValue("BoyMm", out v)) a.BoyMm = decimal.Parse(v, c);
                 if (d.TryGetValue("KenarMm", out v)) a.KenarMm = decimal.Parse(v, c);
@@ -1009,8 +1009,8 @@ namespace EtiketYazdir
             cbYazici.SelectedItem = string.IsNullOrEmpty(a.Yazici) ? varsayilan : a.Yazici;
             Satir(t, "Yazıcı", cbYazici);
 
-            r55 = new RadioButton(); r55.Text = "55 mm"; r55.AutoSize = true; r55.Checked = a.GenislikMm == 55;
-            r85 = new RadioButton(); r85.Text = "72 mm"; r85.AutoSize = true; r85.Checked = a.GenislikMm != 55;
+            r55 = new RadioButton(); r55.Text = "50 mm"; r55.AutoSize = true; r55.Checked = a.GenislikMm == 50;
+            r85 = new RadioButton(); r85.Text = "72 mm"; r85.AutoSize = true; r85.Checked = a.GenislikMm != 50;
             Satir(t, "Etiket genişliği", Grup(r55, r85));
 
             rOto = new RadioButton(); rOto.Text = "Otomatik (içeriğe göre)"; rOto.AutoSize = true; rOto.Checked = !a.SabitBoy;
@@ -1094,7 +1094,7 @@ namespace EtiketYazdir
         void Kaydet(object s, EventArgs e)
         {
             ay.Yazici = cbYazici.SelectedItem as string ?? "";
-            ay.GenislikMm = r55.Checked ? 55 : 72;
+            ay.GenislikMm = r55.Checked ? 50 : 72;
             ay.SabitBoy = rSabit.Checked;
             ay.BoyMm = nBoy.Value;
             ay.KenarMm = nKenar.Value;

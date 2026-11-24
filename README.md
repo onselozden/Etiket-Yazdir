@@ -2,7 +2,7 @@
 
 Termal etiket yazıcıları için metin ve görsel çıktı programı (Windows).
 
-- 55 mm / 72 mm etiket genişliği (Ayarlar)
+- 50 mm / 72 mm etiket genişliği (Ayarlar)
 - Metin: yazı tipi, boyut, kalın, hizalama, otomatik boyut (satıra yay)
 - Görsel: aç, Ctrl+V ile yapıştır, döndür, fotoğraf tarama
 - Otomatik veya sabit etiket boyu, canlı önizleme, kopya sayısı
