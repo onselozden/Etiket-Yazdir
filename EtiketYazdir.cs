@@ -15,7 +15,7 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("Etiket Yazdır")]
 [assembly: System.Reflection.AssemblyProduct("Etiket Yazdır")]
 [assembly: System.Reflection.AssemblyCompany("Önsel Özden")]
-[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
 
 namespace EtiketYazdir
 {
@@ -171,6 +171,7 @@ namespace EtiketYazdir
         NumericUpDown nBoyut, nKopya;
         CheckBox chKalin, chSigdir, chTarama, chOto;
         float sonBoyut;
+        string sonHata = "";
         RadioButton rSol, rOrta, rSag, rUst, rAlt;
         Label lblGorsel;
         PictureBox onizleme;
@@ -213,7 +214,7 @@ namespace EtiketYazdir
             menu.Items.Add(new ToolStripMenuItem("Ayarlar", null, delegate { AyarlarAc(); }));
             menu.Items.Add(new ToolStripMenuItem("Hakkında", null, delegate
             {
-                MessageBox.Show(this, "Etiket Yazdır v1.0\n\nTermal etiket yazıcıları için\nmetin ve görsel çıktı programı.\n\nHazırlayan: Önsel Özden",
+                MessageBox.Show(this, "Etiket Yazdır v1.1\n\nTermal etiket yazıcıları için\nmetin ve görsel çıktı programı.\n\nHazırlayan: Önsel Özden",
                     "Hakkında", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }));
 
@@ -587,15 +588,28 @@ namespace EtiketYazdir
                     int maxH = int.MaxValue;
                     if (ay.SabitBoy)
                         maxH = Cizim.Px((double)ay.BoyMm, dpi) - 2 * m - (gb != null ? gb.Height + bosluk : 0);
-                    pt = OtoBoyut(txt.Text, fad, st, dpi, ic, maxH);
+                    tb = OtoMetin(txt.Text, fad, st, dpi, ic, maxH,
+                        rSol.Checked ? 0 : (rSag.Checked ? 2 : 1), out pt);
+                    sonBoyut = pt;
                 }
+            }
+            if (!chOto.Checked && txt.Text.Trim().Length > 0)
+            {
+                FontStyle st = chKalin.Checked ? FontStyle.Bold : FontStyle.Regular;
+                string fad = cbFont.SelectedItem as string ?? "Arial";
+                try { using (new Font(fad, 10f, st)) { } } catch { fad = "Arial"; }
+                float pt = (float)nBoyut.Value;
+                bool oto = false;
                 sonBoyut = pt;
                 Font f = new Font(fad, pt, st, GraphicsUnit.Point);
                 using (f)
                 using (StringFormat sf = oto ? (StringFormat)StringFormat.GenericTypographic.Clone() : new StringFormat())
                 {
-                    if (oto) sf.FormatFlags |= StringFormatFlags.NoWrap | StringFormatFlags.MeasureTrailingSpaces;
+                    if (oto) sf.FormatFlags |= StringFormatFlags.NoWrap;
+                    sf.FormatFlags &= ~StringFormatFlags.LineLimit;
+                    sf.FormatFlags |= StringFormatFlags.NoClip;
                     sf.Alignment = rSol.Checked ? StringAlignment.Near : (rSag.Checked ? StringAlignment.Far : StringAlignment.Center);
+                    string metin = txt.Text.Replace("\r\n", "\n").TrimEnd('\n', ' ');
                     int h;
                     using (Bitmap olc = new Bitmap(1, 1))
                     {
@@ -603,7 +617,11 @@ namespace EtiketYazdir
                         using (Graphics g = Graphics.FromImage(olc))
                         {
                             g.PageUnit = GraphicsUnit.Pixel;
-                            h = (int)Math.Ceiling(g.MeasureString(txt.Text, f, ic, sf).Height) + 2;
+                            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+                            float olcH = g.MeasureString(metin, f, ic, sf).Height;
+                            int satir = metin.Split('\n').Length;
+                            float minH = f.GetHeight(g) * satir;
+                            h = (int)Math.Ceiling(Math.Max(olcH, minH)) + 6;
                         }
                     }
                     using (Bitmap t = new Bitmap(ic, Math.Max(1, h)))
@@ -614,7 +632,7 @@ namespace EtiketYazdir
                             g.PageUnit = GraphicsUnit.Pixel;
                             g.Clear(Color.White);
                             g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-                            g.DrawString(txt.Text, f, Brushes.Black, new RectangleF(0, 0, ic, h), sf);
+                            g.DrawString(metin, f, Brushes.Black, new RectangleF(0, 2, ic, h), sf);
                         }
                         tb = Cizim.SiyahBeyaz(t, false);
                     }
@@ -680,7 +698,7 @@ namespace EtiketYazdir
                         using (Font f = new Font(fad, mid, st, GraphicsUnit.Point))
                         {
                             foreach (string s in satirlar)
-                                if (s.Trim().Length > 0 && g.MeasureString(s.TrimEnd(), f, PointF.Empty, sf).Width > ic - 2)
+                                if (s.Trim().Length > 0 && g.MeasureString(s.TrimEnd(), f, PointF.Empty, sf).Width > ic * 0.97f)
                                 { sigar = false; break; }
                             if (sigar && maxH != int.MaxValue)
                                 sigar = g.MeasureString(text, f, new SizeF(ic, 100000), sf).Height + 4 <= maxH;
@@ -692,7 +710,122 @@ namespace EtiketYazdir
             }
         }
 
-        void Yenile()
+        // Bir satırı geniş bir tuvale çizer ve mürekkep (siyah) alanına kırpar
+        static Bitmap SatirCiz(string s, string fad, float pt, FontStyle st, int dpi)
+        {
+            using (Font f = new Font(fad, pt, st, GraphicsUnit.Point))
+            {
+                float em = pt / 72f * dpi;
+                int pad = (int)(em * 0.5f) + 4;
+                int w = (int)Math.Min(30000, em * (s.Length + 2) * 1.2f) + pad * 2;
+                int h = (int)(em * 2f) + pad * 2;
+                using (Bitmap b = new Bitmap(w, h, PixelFormat.Format32bppArgb))
+                {
+                    b.SetResolution(dpi, dpi);
+                    using (Graphics g = Graphics.FromImage(b))
+                    {
+                        g.Clear(Color.White);
+                        g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+                        g.DrawString(s, f, Brushes.Black, pad, pad);
+                    }
+                    Rectangle r = Murekkep(b);
+                    if (r.Width <= 0 || r.Height <= 0) return null;
+                    return b.Clone(r, PixelFormat.Format32bppArgb);
+                }
+            }
+        }
+
+        static Rectangle Murekkep(Bitmap b)
+        {
+            int w = b.Width, h = b.Height;
+            BitmapData bd = b.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            byte[] p = new byte[bd.Stride * h];
+            Marshal.Copy(bd.Scan0, p, 0, p.Length);
+            int stride = bd.Stride;
+            b.UnlockBits(bd);
+            int x0 = w, y0 = h, x1 = -1, y1 = -1;
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    if (p[y * stride + x * 4 + 1] < 140)
+                    {
+                        if (x < x0) x0 = x; if (x > x1) x1 = x;
+                        if (y < y0) y0 = y; if (y > y1) y1 = y;
+                    }
+            if (x1 < 0) return Rectangle.Empty;
+            return new Rectangle(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+        }
+
+        // Otomatik boyut: her satır aynı puntoda, en uzun satır genişliği doldurur
+        static Bitmap OtoMetin(string text, string fad, FontStyle st, int dpi, int ic, int maxH, int hiza, out float pt)
+        {
+            string[] satirlar = text.Replace("\r", "").TrimEnd('\n', ' ').Split('\n');
+            const float REF = 60f;
+            float maxW = 0, topH = 0, bosH = REF / 72f * dpi * 0.9f;
+            int dolu = 0;
+            foreach (string s in satirlar)
+            {
+                if (s.Trim().Length == 0) { topH += bosH; continue; }
+                using (Bitmap b = SatirCiz(s.Trim(), fad, REF, st, dpi))
+                {
+                    if (b == null) continue;
+                    maxW = Math.Max(maxW, b.Width);
+                    topH += b.Height;
+                    dolu++;
+                }
+            }
+            pt = REF;
+            if (maxW <= 0) return null;
+            float araOran = 0.25f; // satır arası, satır yüksekliğine göre
+            float refAra = (topH / Math.Max(1, dolu)) * araOran * Math.Max(0, satirlar.Length - 1);
+            pt = REF * (ic * 0.98f) / maxW;
+            if (maxH != int.MaxValue && maxH > 0)
+                pt = Math.Min(pt, REF * maxH / (topH + refAra));
+            pt = Math.Max(4f, Math.Min(pt, 1500f));
+
+            List<Bitmap> parcalar = new List<Bitmap>();
+            float bos = pt / 72f * dpi * 0.9f;
+            foreach (string s in satirlar)
+            {
+                Bitmap b = s.Trim().Length == 0 ? null : SatirCiz(s.Trim(), fad, pt, st, dpi);
+                if (b != null && b.Width > ic)
+                {
+                    Bitmap k = new Bitmap(ic, Math.Max(1, b.Height * ic / b.Width));
+                    using (Graphics g = Graphics.FromImage(k))
+                    {
+                        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                        g.DrawImage(b, 0, 0, k.Width, k.Height);
+                    }
+                    b.Dispose();
+                    b = k;
+                }
+                parcalar.Add(b);
+            }
+            int ortH = 0, n = 0;
+            foreach (Bitmap b in parcalar) if (b != null) { ortH += b.Height; n++; }
+            int ara = n > 0 ? (int)(ortH / n * araOran) : 0;
+            int H = 0;
+            foreach (Bitmap b in parcalar) H += b != null ? b.Height : (int)bos;
+            H += ara * Math.Max(0, parcalar.Count - 1);
+            Bitmap sonuc = new Bitmap(ic, Math.Max(1, H));
+            using (Graphics g = Graphics.FromImage(sonuc))
+            {
+                g.Clear(Color.White);
+                int y = 0;
+                foreach (Bitmap b in parcalar)
+                {
+                    if (b == null) { y += (int)bos + ara; continue; }
+                    int x = hiza == 0 ? 0 : (hiza == 2 ? ic - b.Width : (ic - b.Width) / 2);
+                    g.DrawImage(b, new Rectangle(x, y, b.Width, b.Height));
+                    y += b.Height + ara;
+                    b.Dispose();
+                }
+            }
+            Bitmap bw = Cizim.SiyahBeyaz(sonuc, false);
+            sonuc.Dispose();
+            return bw;
+        }
+
+        bool Yenile()
         {
             try
             {
@@ -707,8 +840,9 @@ namespace EtiketYazdir
                 if (tasma) s += "   |   ⚠ İçerik sabit etiket boyuna sığmıyor";
                 durum.Text = s;
                 OnizlemeGoster();
+                return true;
             }
-            catch (Exception ex) { durum.Text = "Hata: " + ex.Message; }
+            catch (Exception ex) { durum.Text = "Hata: " + ex.Message; sonHata = ex.ToString(); return false; }
         }
 
         void OnizlemeGoster()
@@ -744,8 +878,11 @@ namespace EtiketYazdir
                 MessageBox.Show(this, "Yazdırılacak bir şey yok.", "Etiket Yazdır");
                 return;
             }
-            Yenile();
-            if (sonuc == null) return;
+            if (!Yenile() || sonuc == null)
+            {
+                MessageBox.Show(this, "Etiket oluşturulamadı:\n" + sonHata, "Etiket Yazdır", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
             double wMm = ay.GenislikMm;
             double hMm = sonuc.Height * 25.4 / sonucDpi;
